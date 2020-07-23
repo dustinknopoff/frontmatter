@@ -22,7 +22,7 @@
 //! This is some content.
 //! ```
 //!
-//! ```rust
+//! ```ignore
 //!     let example_text = r#"+++
 //! title = "TOML Frontmatter"
 //! list = [
