@@ -1,6 +1,55 @@
-///! Adapted from https://bodil.lol/parser-combinators/
+#![warn(missing_debug_implementations, missing_docs, rust_2018_idioms)]
+#![warn(clippy::all)]
+//! # Frontmatter
+//!
+//! ![build-and-check](https://github.com/dustinknopoff/frontmatter/workflows/build-and-check/badge.svg)
+//!
+//! A simple, no-dependency library for separating YAML or TOML frontmatter from some text.
+//!
+//! For example, Let's say you have a markdown document:
+//!
+//! ```toml
+//! +++
+//! title = "TOML Frontmatter"
+//! list = [
+//!     "Of",
+//!     "Things",
+//! ]
+//! [[assets]]
+//! contentType = "audio/mpeg"
+//! +++
+//!
+//! This is some content.
+//! ```
+//!
+//! ```rust
+//!     let example_text = r#"+++
+//! title = "TOML Frontmatter"
+//! list = [
+//!     "Of",
+//!     "Things",
+//! ]
+//! [[assets]]
+//! contentType = "audio/mpeg"
+//! +++"#;
+//!     if let Some((frontmatter, content)) = split_matter(&content) {
+//!         // Do something, probably deserializing the frontmatter in to YAML/TOML
+//!         assert_ne!(f.len(), 0);
+//!         assert_eq!(c, "This is some content.");
+//!     }
+//! ```
+//!
+//! ## Installation
+//!
+//! Add the following to your `Cargo.toml`
+//!
+//! ```toml
+//! frontmatter = { git="https://github.com/dustinknopoff/frontmatter", branch="master"}
+//! ```
+//! Adapted from https://bodil.lol/parser-combinators/
 use combinators::*;
 use parsers::*;
+/// The type returned by parsers
 pub type ParseResult<'a, Output> = Result<(&'a str, Output), &'a str>;
 
 /// Shared trait among all combinators
@@ -38,7 +87,7 @@ pub(crate) mod parsers {
         }
     }
 
-    pub(crate) fn front_matter(input: &str) -> ParseResult<String> {
+    pub(crate) fn front_matter(input: &str) -> ParseResult<'_, String> {
         let mut matched = String::new();
         let chars = input.chars();
         let mut dash_count = 0;
@@ -152,7 +201,7 @@ mod combinators {
         }
     }
 
-    pub(crate) fn any_char(input: &str) -> ParseResult<char> {
+    pub(crate) fn any_char(input: &str) -> ParseResult<'_, char> {
         match input.chars().next() {
             Some(next) => Ok((&input[next.len_utf8()..], next)),
             _ => Err(input),
@@ -179,6 +228,9 @@ mod combinators {
     }
 }
 
+/// Given a string, splits off the the frontmatter from the content
+///
+/// Intended to be a drop-in replacement of [matter](https://crates.io/crates/matter)
 pub fn matter(input: &str) -> Option<(String, String)> {
     match split_matter(input) {
         Ok((front, content)) => Some((front, content)),
@@ -189,6 +241,12 @@ pub fn matter(input: &str) -> Option<(String, String)> {
     }
 }
 
+/// Given a string, splits off the the frontmatter from the content
+///
+/// Returns a result of
+///
+/// - A tuple of (frontmatter, content) as `Strings`
+/// - The rest of the input `&str` from where the parser failed
 pub fn split_matter(input: &str) -> Result<(String, String), &str> {
     let delimiter = or(match_literal("---"), match_literal("+++"));
     let delimiter_2 = or(match_literal("---"), match_literal("+++"));
