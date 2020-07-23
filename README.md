@@ -1,6 +1,8 @@
 # Frontmatter 
 
 ![build-and-check](https://github.com/dustinknopoff/frontmatter/workflows/build-and-check/badge.svg)
+[![LICENSE](https://img.shields.io/badge/license-BSD-blue.svg)](LICENSE)
+![no_std](https://img.shields.io/badge/no__std-compat-orange)
 
 Inspired by [matter](https://crates.io/crates/matter)
 
