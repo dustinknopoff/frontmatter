@@ -58,7 +58,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: thumbv6m-none-eabi
+          target: thumbv6m-none-eabi
+          toolchain: stable
           override: true
 
       - name: Run cargo test
