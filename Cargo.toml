@@ -6,3 +6,6 @@ version = "0.1.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(wasm)'.dev-dependencies]
+wasm-bindgen = "0.2"
