@@ -1,8 +1,9 @@
+///! Adapted from https://bodil.lol/parser-combinators/
 use combinators::*;
 use parsers::*;
-/// Adapted from https://bodil.lol/parser-combinators/
 pub type ParseResult<'a, Output> = Result<(&'a str, Output), &'a str>;
 
+/// Shared trait among all combinators
 pub(crate) trait Parser<'a, Output> {
     fn parse(&self, input: &'a str) -> ParseResult<'a, Output>;
 }
@@ -16,8 +17,20 @@ where
     }
 }
 
-mod parsers {
+pub(crate) mod parsers {
     use super::*;
+    /// Creates a parser that matches the passed in literal
+    ///
+    /// ### Example
+    /// ```ignore
+    /// let parse_joe = match_literal("Hello Joe!");
+    /// assert_eq!(Ok(("", ())), parse_joe.parse("Hello Joe!"));
+    /// assert_eq!(
+    ///     Ok((" Hello Robert!", ())),
+    ///     parse_joe.parse("Hello Joe! Hello Robert!")
+    /// );
+    /// assert_eq!(Err("Hello Mike!"), parse_joe.parse("Hello Mike!"));
+    /// ```
     pub(crate) fn match_literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
         move |input: &'a str| match input.get(0..expected.len()) {
             Some(next) if next == expected => Ok((&input[expected.len()..], ())),
@@ -62,6 +75,7 @@ mod parsers {
 
 mod combinators {
     use super::*;
+    /// Creates and sets up the second parser to run immediately after the first
     pub(crate) fn pair<'a, P1, P2, R1, R2>(parser1: P1, parser2: P2) -> impl Parser<'a, (R1, R2)>
     where
         P1: Parser<'a, R1>,
