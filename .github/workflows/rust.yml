@@ -47,7 +47,7 @@ jobs:
         with:
           command: test
 
-  test:
+  nostd:
     name: No Std Test Suite
     runs-on: ubuntu-latest
     steps:
