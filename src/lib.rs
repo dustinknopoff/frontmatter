@@ -234,10 +234,7 @@ mod combinators {
 pub fn matter(input: &str) -> Option<(String, String)> {
     match split_matter(input) {
         Ok((front, content)) => Some((front, content)),
-        Err(val) => {
-            dbg!(val);
-            None
-        }
+        Err(_) => None,
     }
 }
 
