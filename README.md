@@ -2,6 +2,8 @@
 
 ![build-and-check](https://github.com/dustinknopoff/frontmatter/workflows/build-and-check/badge.svg)
 
+Inspired by [matter](https://crates.io/crates/matter)
+
 A simple, no-dependency library for separating YAML or TOML frontmatter from some text.
 
 For example, Let's say you have a markdown document:
