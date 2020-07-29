@@ -1,8 +1,9 @@
 [package]
 authors = ["Dustin Knopoff <dustinknopoff@gmail.com>"]
 edition = "2018"
+include = ["src/lib.rs", "LICENSE", "README.md"]
 name = "frontmatter"
-version = "0.1.0"
+version = "0.1.1"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
