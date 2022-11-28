@@ -231,16 +231,21 @@ mod combinators {
     }
 }
 
+/// Combined error type for all frontmatter errors
 #[derive(Debug, Error)]
 pub enum MatterError {
+    /// Errors from failing yaml deserialization
     #[cfg(all(feature = "yaml", not(feature = "toml")))]
     #[error("failed to deserialize")]
     SerializationError(#[from] serde_yaml::Error),
+    /// Errors from failing toml deserialization
     #[cfg(all(feature = "toml", not(feature = "yaml")))]
     #[error("failed to deserialize")]
     SerializationError(#[from] toml_edit::de::Error),
+    /// Errors from to parse frontmatter from the provided String
     #[error("`{0}` failed to be parsed. Make sure your frontmatter is wrapped with --- or +++")]
     ParseError(String),
+    /// Unknown
     #[error("unknown parse error")]
     Unknown,
 }

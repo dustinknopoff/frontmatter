@@ -42,10 +42,17 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Run cargo test
+      - name: Run cargo test (yaml)
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --features yaml
+
+      - name: Run cargo test (toml)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features toml
 
   nostd:
     name: No Std Test Suite
