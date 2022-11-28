@@ -3,7 +3,7 @@ authors = ["Dustin Knopoff <dustinknopoff@gmail.com>"]
 edition = "2021"
 include = ["src/lib.rs", "LICENSE", "README.md"]
 name = "frontmatter"
-version = "0.2"
+version = "0.2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
