@@ -49,6 +49,9 @@
 //! Adapted from https://bodil.lol/parser-combinators/
 use combinators::*;
 use parsers::*;
+#[cfg(any(feature = "yaml", feature = "toml"))]
+use serde::de::DeserializeOwned;
+use thiserror::Error;
 /// The type returned by parsers
 pub type ParseResult<'a, Output> = Result<(&'a str, Output), &'a str>;
 
@@ -228,6 +231,20 @@ mod combinators {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum MatterError {
+    #[cfg(all(feature = "yaml", not(feature = "toml")))]
+    #[error("failed to deserialize")]
+    SerializationError(#[from] serde_yaml::Error),
+    #[cfg(all(feature = "toml", not(feature = "yaml")))]
+    #[error("failed to deserialize")]
+    SerializationError(#[from] toml_edit::de::Error),
+    #[error("`{0}` failed to be parsed. Make sure your frontmatter is wrapped with --- or +++")]
+    ParseError(String),
+    #[error("unknown parse error")]
+    Unknown,
+}
+
 /// Given a string, splits off the the frontmatter from the content
 ///
 /// Intended to be a drop-in replacement of [matter](https://crates.io/crates/matter)
@@ -244,7 +261,7 @@ pub fn matter(input: &str) -> Option<(String, String)> {
 ///
 /// - A tuple of (frontmatter, content) as `Strings`
 /// - The rest of the input `&str` from where the parser failed
-pub fn split_matter(input: &str) -> Result<(String, String), &str> {
+pub fn split_matter(input: &str) -> Result<(String, String), MatterError> {
     let delimiter = or(match_literal("---"), match_literal("+++"));
     let delimiter_2 = or(match_literal("---"), match_literal("+++"));
     let parser = right(
@@ -257,6 +274,74 @@ pub fn split_matter(input: &str) -> Result<(String, String), &str> {
     parser
         .parse(input)
         .map(|(content, front)| (front, content.to_string()))
+        .map_err(|err| MatterError::ParseError(String::from(err)))
+}
+
+#[cfg(feature = "yaml")]
+/// Given a string, splits off the the frontmatter from the content
+///
+/// Returns a result of
+///
+/// - A tuple of (frontmatter, content) as `(T, String)`
+/// - The rest of the input `&str` from where the parser failed
+pub fn split_matter_yaml<'s, T>(input: &'s str) -> Result<(T, String), MatterError>
+where
+    T: DeserializeOwned,
+{
+    let delimiter = or(match_literal("---"), match_literal("+++"));
+    let delimiter_2 = or(match_literal("---"), match_literal("+++"));
+    let parser = right(
+        right(delimiter, one_or_more(whitespace_char())),
+        left(
+            front_matter,
+            pair(delimiter_2, one_or_more(whitespace_char())),
+        ),
+    );
+    let parse_result = parser
+        .parse(input)
+        .map(|(content, front)| (front, content.to_string()));
+    match parse_result {
+        Ok((front, content)) => match serde_yaml::from_str::<T>(&front) {
+            Ok(val) => Ok((val, String::from(content))),
+            Err(err) => Err(MatterError::SerializationError(err)),
+        },
+        Err(parse_err) => Err(MatterError::ParseError(String::from(parse_err))),
+    }
+}
+
+#[cfg(feature = "toml")]
+/// Given a string, splits off the the frontmatter from the content
+///
+/// Returns a result of
+///
+/// - A tuple of (frontmatter, content) as `(T, String)`
+/// - The rest of the input `&str` from where the parser failed
+pub fn split_matter_toml<'s, T>(input: &'s str) -> Result<(T, String), MatterError>
+where
+    T: DeserializeOwned,
+{
+    let delimiter = or(match_literal("---"), match_literal("+++"));
+    let delimiter_2 = or(match_literal("---"), match_literal("+++"));
+    let parser = right(
+        right(delimiter, one_or_more(whitespace_char())),
+        left(
+            front_matter,
+            pair(delimiter_2, one_or_more(whitespace_char())),
+        ),
+    );
+    let parse_result = parser
+        .parse(input)
+        .map(|(content, front)| (front, content.to_string()));
+    match parse_result {
+        Ok((front, content)) => {
+            let deserialized = toml_edit::de::from_str(&front);
+            match deserialized {
+                Ok(val) => Ok((val, content)),
+                Err(err) => Err(MatterError::SerializationError(err)),
+            }
+        }
+        Err(parse_err) => Err(MatterError::ParseError(String::from(parse_err))),
+    }
 }
 
 #[cfg(test)]
@@ -396,6 +481,126 @@ Text"#;
         let (f, c) = split_matter(contents).unwrap();
 
         assert_ne!(f.len(), 0);
+        assert_eq!(c, "Text");
+    }
+}
+
+#[cfg(all(test, feature = "yaml"))]
+mod yaml_tests {
+    use serde::Deserialize;
+
+    use crate::{split_matter_yaml, MatterError};
+
+    #[derive(Debug, Deserialize, Eq, PartialEq)]
+    struct Frontmatter {
+        availability: String,
+        when: String,
+        date: String,
+        title: String,
+    }
+
+    #[derive(Debug, Deserialize, Eq, PartialEq)]
+    struct FrontmatterFallible {
+        availability: String,
+        when: String,
+        date: String,
+        title: bool,
+    }
+
+    #[test]
+    fn extract_and_parse_yaml() {
+        let contents = r#"---
+availability: public
+when: tuesday
+date: 2012-02-18
+title: Rutejìmo
+---
+
+Text"#;
+
+        let (f, c): (Frontmatter, String) = split_matter_yaml(contents).unwrap();
+
+        assert_eq!(
+            f,
+            Frontmatter {
+                availability: String::from("public"),
+                when: String::from("tuesday"),
+                date: String::from("2012-02-18"),
+                title: String::from("Rutejìmo"),
+            }
+        );
+        assert_eq!(c, "Text");
+    }
+
+    #[test]
+    fn parse_error_handling() {
+        let contents = r#"---
+availability: public
+when: tuesday
+date: 2012-02-18
+title: Rutejìmo
+--
+
+Text"#;
+
+        let res: Result<(Frontmatter, String), MatterError> = split_matter_yaml(contents);
+        assert!(res.is_err());
+        assert!(matches!(res, Err(MatterError::ParseError(String))));
+    }
+
+    #[test]
+    fn serde_error_handling() {
+        let contents = r#"---
+availability: public
+when: tuesday
+date: 2012-02-18
+title: Rutejìmo
+---
+
+Text"#;
+
+        let res: Result<(FrontmatterFallible, String), MatterError> = split_matter_yaml(contents);
+        assert!(res.is_err());
+        assert!(matches!(res, Err(MatterError::SerializationError(_))));
+    }
+}
+
+#[cfg(all(test, feature = "toml"))]
+mod toml_tests {
+    use serde::Deserialize;
+
+    use crate::split_matter_toml;
+
+    #[derive(Debug, Deserialize, Eq, PartialEq)]
+    struct Frontmatter {
+        availability: String,
+        when: String,
+        date: String,
+        title: String,
+    }
+
+    #[test]
+    fn extract_and_parse_toml() {
+        let contents = r#"+++
+availability = "public"
+when = "tuesday"
+date = "2012-02-18"
+title = "Rutejìmo"
++++
+
+Text"#;
+
+        let (f, c): (Frontmatter, String) = split_matter_toml(contents).unwrap();
+
+        assert_eq!(
+            f,
+            Frontmatter {
+                availability: String::from("public"),
+                when: String::from("tuesday"),
+                date: String::from("2012-02-18"),
+                title: String::from("Rutejìmo"),
+            }
+        );
         assert_eq!(c, "Text");
     }
 }
